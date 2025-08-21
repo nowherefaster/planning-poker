@@ -4,25 +4,28 @@ import { Server } from 'socket.io';
 // The main handler for our serverless function
 export default function handler(req, res) {
   // Check if a Socket.IO server instance already exists on the response socket
+  // This is the singleton pattern that ensures the server is only created once
   if (!res.socket.server.io) {
-    console.log('*First use, starting Socket.IO');
+    console.log('Backend: Starting Socket.IO server...');
 
     // Create a new Socket.IO server and attach it to the HTTP server
     const io = new Server(res.socket.server, {
       path: '/api/socket', // We must specify the path here to match the client
-      // We are leaving out the `addTrailingSlash` option here, as the new server setup
-      // correctly handles it.
+      // Explicitly tell the server to handle connections from all origins for this public app
+      cors: {
+        origin: '*',
+      },
     });
 
     // Handle the 'connection' event when a new client connects
     io.on('connection', (socket) => {
-      console.log(`New client connected: ${socket.id}`);
+      console.log(`Backend: New client connected with ID: ${socket.id}`);
 
       // Handle the 'join-room' event from the client
       socket.on('join-room', ({ roomid, user }) => {
         // Join the specified room
         socket.join(roomid);
-        console.log(`${user} joined room ${roomid}`);
+        console.log(`Backend: ${user} joined room ${roomid}`);
 
         // Emit a message back to the user who just joined
         socket.emit('update-room', {
@@ -37,7 +40,7 @@ export default function handler(req, res) {
 
       // Handle the 'disconnect' event when a client leaves
       socket.on('disconnect', () => {
-        console.log(`Client disconnected: ${socket.id}`);
+        console.log(`Backend: Client disconnected with ID: ${socket.id}`);
       });
     });
 
@@ -45,7 +48,7 @@ export default function handler(req, res) {
     res.socket.server.io = io;
   } else {
     // If an instance already exists, we just reuse it
-    console.log('Socket.IO is already running');
+    console.log('Backend: Socket.IO is already running, reusing instance.');
   }
 
   // End the response to complete the serverless function call
