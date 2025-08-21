@@ -19,7 +19,8 @@ export default function Home() {
       // Connect to the server's Socket.IO endpoint using a relative path
       const socket = io({
         path: '/api/socket',
-        transports: ['websocket', 'polling'] // Explicitly use websockets first, then fallback
+        transports: ['websocket', 'polling'], // Prioritize websockets
+        reconnectionAttempts: 5 // Add more attempts to reconnect on failure
       });
       
       // Store the socket instance in the ref
