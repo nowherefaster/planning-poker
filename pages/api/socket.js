@@ -1,23 +1,23 @@
 // This is our serverless function that will handle WebSocket connections
 import { Server } from 'socket.io';
-import http from 'http';
 
-// Create a global singleton instance of the HTTP server and the Socket.IO server
+// We create a global singleton instance of the Socket.IO server
 let io;
-let server;
 
 // The main handler for our serverless function
 export default function handler(req, res) {
-  // If the server and io instances don't exist, create them
-  if (!server) {
-    console.log('Backend: Creating new HTTP server and Socket.IO instance.');
-    
-    // Create the HTTP server
-    server = http.createServer(req, res);
-    
+  // Check if a Socket.IO server instance already exists on the response socket
+  // This is the singleton pattern that ensures the server is only created once
+  if (!res.socket.server.io) {
+    console.log('Backend: Starting new Socket.IO server instance...');
+
     // Create the Socket.IO server and attach it to the HTTP server
-    io = new Server(server, {
-      path: '/api/socket' // We must specify the path here to match the client
+    const io = new Server(res.socket.server, {
+      path: '/api/socket', // We must specify the path here to match the client
+      addTrailingSlash: false, // This is crucial to avoid 404/500 errors
+      cors: {
+        origin: '*',
+      },
     });
 
     // Handle the 'connection' event when a new client connects
@@ -46,19 +46,14 @@ export default function handler(req, res) {
         console.log(`Backend: Client disconnected with ID: ${socket.id}`);
       });
     });
-    
-    // This is the crucial part for Vercel: handling the 'upgrade' event
-    // We attach a listener to the server to handle the WebSocket upgrade
-    server.on('upgrade', (req, socket, head) => {
-      console.log('Backend: Received upgrade request. Handling...');
-      io.engine.handleUpgrade(req, socket, head);
-    });
+
+    // Attach the Socket.IO instance to the server so it's not created again
+    res.socket.server.io = io;
   } else {
-    // If the server already exists, we just handle the request as normal
-    console.log('Backend: Reusing existing HTTP server and Socket.IO instance.');
-    io.engine.handleRequest(req, res);
+    // If an instance already exists, we just reuse it
+    console.log('Backend: Socket.IO instance already exists, reusing.');
   }
 
-  // End the response to allow the serverless function to complete
+  // End the response to complete the serverless function call
   res.end();
 }
