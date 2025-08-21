@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 
 // Import Firebase and Firestore modules
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 let app, auth, db;
@@ -37,14 +37,8 @@ export default function Home() {
         db = getFirestore(app);
         auth = getAuth(app);
 
-        // Sign in the user. We try with the custom token first, then fall back to anonymous.
-        if (initialAuthToken && initialAuthToken.split('.').length === 3) {
-          // Only attempt custom token sign-in if the format is valid
-          await signInWithCustomToken(auth, initialAuthToken);
-        } else {
-          // Fall back to anonymous sign-in, which is perfect for this app
-          await signInAnonymously(auth);
-        }
+        // Sign in the user anonymously. This is the simplest method and ideal for this app.
+        await signInAnonymously(auth);
 
         // Set up an auth state listener to get the user ID
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
