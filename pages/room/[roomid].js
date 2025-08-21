@@ -1,84 +1,87 @@
-import React, { useEffect, useState } from 'react';
+// This is the room page, where users will be able to vote and see results
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import Head from 'next/head';
-import io from 'socket.io-client';
+import { io } from 'socket.io-client';
 
-let socket;
-
-const PokerRoom = () => {
+// The main component for our planning poker room
+export default function Room() {
   const router = useRouter();
-  const { roomid, user } = router.query;
+  const { room, user } = router.query;
+  
+  // Use a ref to store the socket instance
+  const socketRef = useRef(null);
 
-  const [message, setMessage] = useState('');
-  const [userName, setUserName] = useState('');
-
-  // Use useEffect to set up the Socket.IO connection
+  // This effect runs once when the component mounts and navigates to this page
   useEffect(() => {
-    // We only want to connect once
-    const socketInitializer = async () => {
-      // Connect to the Socket.IO server at the same URL as the app
-      await fetch('/api/socket');
-      socket = io();
+    // We only create the socket connection if it doesn't already exist
+    if (!socketRef.current) {
+      console.log('Room page: Attempting to connect to socket.io...');
+      
+      const socket = io({
+        path: '/api/socket' // Explicitly set the path to our serverless function
+      });
+      
+      socketRef.current = socket;
 
-      // Listen for a "connect" event and set the message
+      // Log when we successfully connect to the server
       socket.on('connect', () => {
-        setMessage('Connected to the server!');
-        console.log('socket connected');
-        // Announce to the server that a new user has joined
-        if (roomid && user) {
-          socket.emit('join-room', { roomid, user });
+        console.log(`Room page: Successfully connected to the server! Socket ID: ${socket.id}`);
+        
+        // After connecting, emit the join-room event
+        if (room && user) {
+          console.log(`Room page: Emitting 'join-room' for room: ${room}, user: ${user}`);
+          socket.emit('join-room', { roomid: room, user });
+        } else {
+          console.error('Room page: Missing room ID or user name in URL query.');
         }
       });
       
-      // Listen for updates from the server
+      // Log any connection errors
+      socket.on('connect_error', (err) => {
+        console.error('Room page: Socket connection error:', err.message);
+      });
+      
+      // Log connection timeout
+      socket.on('connect_timeout', (timeout) => {
+        console.error('Room page: Socket connection timeout:', timeout);
+      });
+
+      // Handle the 'update-room' event, which is a personalized welcome message
       socket.on('update-room', (data) => {
-        console.log(data.message);
-        // You'll handle more complex updates here later, like user lists and votes
+        console.log(`Room page: Server message: ${data.message}`);
       });
-
-      // Listen for a "user-joined" event and update the message
+      
+      // Handle the 'user-joined' event, which is a broadcast to all users in the room
       socket.on('user-joined', (data) => {
-        setMessage(`${data.user} has joined the room!`);
+        console.log(`Room page: Server broadcast: ${data.user} has joined the room!`);
       });
 
-      // Listen for a "new-message" event and set the message state
-      socket.on('new-message', (msg) => {
-        setMessage(msg);
-      });
-    };
-
-    if (roomid) {
-      socketInitializer();
+      // Clean up the socket connection when the component unmounts
+      return () => {
+        if (socket.connected) {
+          socket.disconnect();
+          console.log('Room page: Disconnected from the server.');
+        }
+      };
     }
-
-    // Clean up the socket connection when the component unmounts
-    return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-    };
-  }, [roomid, user]);
-  
-  // Get user name from the URL
-  useEffect(() => {
-    if (user) {
-      setUserName(decodeURIComponent(user));
-    }
-  }, [user]);
+  }, [room, user]); // Depend on room and user to ensure connection if they change
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 font-sans">
-      <Head>
-        <title>Poker Room: {roomid}</title>
-      </Head>
-
-      <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md text-center">
-        <h1 className="text-3xl font-bold mb-2 text-slalom-blue-dark">Hello, {userName}</h1>
-        <p className="text-gray-600 mb-6">Welcome to Poker Room: <span className="font-mono bg-gray-200 px-2 py-1 rounded-md">{roomid}</span></p>
-        <p className="text-gray-600 mb-6">Status: {message}</p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4">
+          Welcome to room: {room}
+        </h1>
+        <p className="text-gray-600">
+          Hello, {user}!
+        </p>
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <p className="text-sm font-semibold text-gray-700">Debugging Logs:</p>
+          <pre className="text-xs text-gray-500 overflow-x-auto whitespace-pre-wrap">
+            Check your browser's console for real-time connection and event logs.
+          </pre>
+        </div>
       </div>
     </div>
   );
-};
-
-export default PokerRoom;
+}
