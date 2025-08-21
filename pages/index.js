@@ -28,22 +28,11 @@ export default function Home() {
       try {
         console.log('Initializing Firebase...');
 
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // Use a fallback configuration if the provided one is not available
-        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        if (!firebaseConfig || !firebaseConfig.projectId) {
-            console.warn('Firebase config missing projectId. Using a fallback to prevent crash.');
-            firebaseConfig = {
-                apiKey: "mock-api-key",
-                authDomain: "mock-auth-domain",
-                projectId: "mock-project-id",
-                storageBucket: "mock-storage-bucket",
-                messagingSenderId: "mock-sender-id",
-                appId: "mock-app-id"
-            };
-        }
+        // Use environment variables provided by Vercel
+        const firebaseConfig = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG);
+        const initialAuthToken = process.env.NEXT_PUBLIC_INITIAL_AUTH_TOKEN;
 
+        // Initialize Firebase with the provided configuration
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
