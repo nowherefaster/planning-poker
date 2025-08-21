@@ -8,19 +8,26 @@ let io;
 
 // The main handler for our serverless function
 export default function handler(req, res) {
-  // If the Socket.IO server is already created, we can skip the setup
+  // Check if the Socket.IO server is already created
   if (io) {
+    console.log('Backend: Reusing existing Socket.IO instance.');
     res.end();
     return;
   }
 
-  // Otherwise, we create a new HTTP server instance
+  // Log that we are starting the server setup
+  console.log('Backend: No existing instance found. Starting new Socket.IO server setup...');
+
+  // Create a new HTTP server instance
   const httpServer = new http.Server(req.socket.server);
   
   // Create a new Socket.IO server and attach it to the HTTP server
   io = new Server(httpServer, {
     path: '/api/socket' // We must specify the path here to match the client
   });
+
+  // Log that the Socket.IO server has been created
+  console.log('Backend: Socket.IO server instance created.');
 
   // Handle the 'connection' event when a new client connects
   io.on('connection', (socket) => {
@@ -51,12 +58,15 @@ export default function handler(req, res) {
 
   // Attach the Socket.IO server to the HTTP server's 'upgrade' event
   httpServer.listen(0, '0.0.0.0', () => {
+    console.log('Backend: HTTP server listening for upgrades.');
     // The following lines are necessary for Vercel to handle the connection
     req.socket.server.on('upgrade', (req, socket, head) => {
+      console.log('Backend: Received upgrade request.');
       io.engine.handleUpgrade(req, socket, head);
     });
   });
 
   // End the response to allow the serverless function to complete
+  console.log('Backend: Serverless function response ending.');
   res.end();
 }
