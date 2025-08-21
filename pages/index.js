@@ -16,13 +16,11 @@ export default function Home() {
   useEffect(() => {
     // We only create the socket connection if it doesn't already exist
     if (!socketRef.current) {
-      // Connect to the server's Socket.IO endpoint using the explicit path option
+      // Connect to the server's Socket.IO endpoint using a relative path
       const socket = io({
         path: '/api/socket'
       });
       
-      console.log('Attempting to connect to socket.io at path: /api/socket');
-
       // Store the socket instance in the ref
       socketRef.current = socket;
 
