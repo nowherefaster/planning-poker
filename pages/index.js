@@ -38,9 +38,11 @@ export default function Home() {
         auth = getAuth(app);
 
         // Sign in the user. We try with the custom token first, then fall back to anonymous.
-        if (initialAuthToken) {
+        if (initialAuthToken && initialAuthToken.split('.').length === 3) {
+          // Only attempt custom token sign-in if the format is valid
           await signInWithCustomToken(auth, initialAuthToken);
         } else {
+          // Fall back to anonymous sign-in, which is perfect for this app
           await signInAnonymously(auth);
         }
 
