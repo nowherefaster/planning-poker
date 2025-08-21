@@ -16,10 +16,11 @@ export default function Home() {
   useEffect(() => {
     // We only create the socket connection if it doesn't already exist
     if (!socketRef.current) {
-      // Connect to the server's Socket.IO endpoint using a relative path
-      const socket = io({
-        path: '/api/socket'
-      });
+      // Get the correct host and protocol for the Vercel URL
+      const vercelUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}` : '';
+      
+      // Connect to the server's Socket.IO endpoint using the absolute path
+      const socket = io(`${vercelUrl}/api/socket`);
       
       // Store the socket instance in the ref
       socketRef.current = socket;
