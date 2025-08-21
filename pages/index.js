@@ -18,7 +18,8 @@ export default function Home() {
     if (!socketRef.current) {
       // Connect to the server's Socket.IO endpoint using a relative path
       const socket = io({
-        path: '/api/socket'
+        path: '/api/socket',
+        transports: ['websocket', 'polling'] // Explicitly use websockets first, then fallback
       });
       
       // Store the socket instance in the ref
@@ -27,6 +28,11 @@ export default function Home() {
       // Handle server-side events
       socket.on('connect', () => {
         console.log('Successfully connected to the server!');
+      });
+      
+      // Handle connection errors
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err.message);
       });
 
       // Handle the 'update-room' event, which is a personalized message for a new user
