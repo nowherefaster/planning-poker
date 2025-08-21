@@ -1,5 +1,5 @@
 // This is our main page, where users enter their details to join a room
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 // Import Firebase and Firestore modules
@@ -28,15 +28,20 @@ export default function Home() {
       try {
         console.log('Initializing Firebase...');
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
-        // Check for project ID before initializing
-        if (!firebaseConfig.projectId) {
-            console.error('Firebase configuration is missing the projectId.');
-            setLoading(false);
-            return;
+        // Use a fallback configuration if the provided one is not available
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        if (!firebaseConfig || !firebaseConfig.projectId) {
+            console.warn('Firebase config missing projectId. Using a fallback to prevent crash.');
+            firebaseConfig = {
+                apiKey: "mock-api-key",
+                authDomain: "mock-auth-domain",
+                projectId: "mock-project-id",
+                storageBucket: "mock-storage-bucket",
+                messagingSenderId: "mock-sender-id",
+                appId: "mock-app-id"
+            };
         }
 
         app = initializeApp(firebaseConfig);
@@ -56,7 +61,6 @@ export default function Home() {
             userId = currentUser.uid;
             console.log('User authenticated with ID:', userId);
           } else {
-            // This case should not be reached with anonymous auth
             console.log('No user authenticated.');
           }
           setLoading(false);
@@ -97,9 +101,11 @@ export default function Home() {
         router.push(`/room/${room}?user=${user}`);
       } catch (error) {
         console.error('Error creating/joining room:', error);
+        // We will show an alert to the user.
         alert('Failed to join room. Please try again.');
       }
     } else {
+      // We will show an alert to the user.
       alert('Please wait for the app to load and then enter your name and a room ID!');
     }
   };
