@@ -16,8 +16,10 @@ export default function Home() {
   useEffect(() => {
     // We only create the socket connection if it doesn't already exist
     if (!socketRef.current) {
-      // Connect to the correct API route for our server
-      const socket = io(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/socket`);
+      // Connect to the server's Socket.IO endpoint using a relative path
+      const socket = io({
+        path: '/api/socket'
+      });
       
       // Store the socket instance in the ref
       socketRef.current = socket;
