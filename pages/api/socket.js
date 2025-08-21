@@ -1,20 +1,17 @@
 // This is our serverless function that will handle WebSocket connections
 import { Server } from 'socket.io';
 
-// We create a global variable to store the socket server instance
-// This is a singleton pattern that works well in a serverless environment
-let io;
-
 // The main handler for our serverless function
 export default function handler(req, res) {
-  // If a Socket.IO server instance does not exist, we create one
+  // Check if a Socket.IO server instance already exists on the response socket
   if (!res.socket.server.io) {
     console.log('*First use, starting Socket.IO');
 
     // Create a new Socket.IO server and attach it to the HTTP server
-    io = new Server(res.socket.server, {
+    const io = new Server(res.socket.server, {
       path: '/api/socket', // We must specify the path here to match the client
-      addTrailingSlash: false // This prevents the client from getting a 404
+      // We are leaving out the `addTrailingSlash` option here, as the new server setup
+      // correctly handles it.
     });
 
     // Handle the 'connection' event when a new client connects
