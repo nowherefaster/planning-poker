@@ -7,19 +7,24 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
+let app, auth, db;
+let userId;
+let firebaseInitialized = false;
+
 // The main component for our planning poker app
 export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState('');
   const [room, setRoom] = useState('');
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // This effect runs once to initialize Firebase and authenticate the user
   useEffect(() => {
     async function initializeFirebase() {
+      if (firebaseInitialized) {
+        setLoading(false);
+        return;
+      }
       try {
         console.log('Initializing Firebase...');
 
@@ -27,22 +32,29 @@ export default function Home() {
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
-        const app = initializeApp(firebaseConfig);
-        const dbInstance = getFirestore(app);
-        const authInstance = getAuth(app);
+        // Check for project ID before initializing
+        if (!firebaseConfig.projectId) {
+            console.error('Firebase configuration is missing the projectId.');
+            setLoading(false);
+            return;
+        }
+
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
 
         // Sign in the user. We try with the custom token first, then fall back to anonymous.
         if (initialAuthToken) {
-          await signInWithCustomToken(authInstance, initialAuthToken);
+          await signInWithCustomToken(auth, initialAuthToken);
         } else {
-          await signInAnonymously(authInstance);
+          await signInAnonymously(auth);
         }
 
         // Set up an auth state listener to get the user ID
-        onAuthStateChanged(authInstance, (currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
           if (currentUser) {
-            setUserId(currentUser.uid);
-            console.log('User authenticated with ID:', currentUser.uid);
+            userId = currentUser.uid;
+            console.log('User authenticated with ID:', userId);
           } else {
             // This case should not be reached with anonymous auth
             console.log('No user authenticated.');
@@ -50,9 +62,10 @@ export default function Home() {
           setLoading(false);
         });
 
-        // Store the Firebase service instances in state
-        setDb(dbInstance);
-        setAuth(authInstance);
+        firebaseInitialized = true;
+
+        // Return a cleanup function
+        return () => unsubscribe();
 
       } catch (error) {
         console.error('Failed to initialize Firebase or authenticate user:', error);
@@ -66,7 +79,7 @@ export default function Home() {
   // Handle the form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (user && room && db && userId) {
+    if (user && room && !loading && db && userId) {
       // Construct the document path for the current room
       const roomRef = doc(db, 'artifacts', userId, 'poker-rooms', room);
       
