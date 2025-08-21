@@ -1,60 +1,101 @@
-[21:30:32.802] Running build in Washington, D.C., USA (East) – iad1
-[21:30:32.812] Build machine configuration: 2 cores, 8 GB
-[21:30:32.854] Cloning github.com/nowherefaster/planning-poker (Branch: main, Commit: 2c34820)
-[21:30:34.085] Cloning completed: 1.223s
-[21:30:35.781] Restored build cache from previous deployment (6Hd4DiTk65pQg8JNqESZfEZBLTQ6)
-[21:30:36.099] Running "vercel build"
-[21:30:36.504] Vercel CLI 46.0.2
-[21:30:36.816] Installing dependencies...
-[21:30:38.183] 
-[21:30:38.185] up to date in 817ms
-[21:30:38.186] 
-[21:30:38.186] 35 packages are looking for funding
-[21:30:38.186]   run `npm fund` for details
-[21:30:38.216] Detected Next.js version: 14.2.32
-[21:30:38.219] Running "npm run build"
-[21:30:38.331] 
-[21:30:38.331] > planning-poker@1.0.0 build
-[21:30:38.331] > next build
-[21:30:38.331] 
-[21:30:39.079]   ▲ Next.js 14.2.32
-[21:30:39.080] 
-[21:30:39.080]    Linting and checking validity of types ...
-[21:30:39.234]    Creating an optimized production build ...
-[21:30:39.782]  ⚠ Found lockfile missing swc dependencies, run next locally to automatically patch
-[21:30:41.085]  ⚠ Found lockfile missing swc dependencies, run next locally to automatically patch
-[21:30:41.802]  ⚠ Found lockfile missing swc dependencies, run next locally to automatically patch
-[21:30:42.417]  ✓ Compiled successfully
-[21:30:42.418]    Collecting page data ...
-[21:30:42.767]  ⚠ Found lockfile missing swc dependencies, run next locally to automatically patch
-[21:30:43.109]    Generating static pages (0/4) ...
-[21:30:43.400]    Generating static pages (1/4) 
-[21:30:43.412]    Generating static pages (2/4) 
-[21:30:43.437]    Generating static pages (3/4) 
-[21:30:43.454]  ✓ Generating static pages (4/4)
-[21:30:43.685]    Finalizing page optimization ...
-[21:30:43.687]    Collecting build traces ...
-[21:30:49.811] 
-[21:30:49.815] Route (pages)                             Size     First Load JS
-[21:30:49.815] ┌ ○ /                                     5.03 kB        84.9 kB
-[21:30:49.816] ├ ○ /404                                  180 B            80 kB
-[21:30:49.816] ├ ƒ /api/socket                           0 B            79.8 kB
-[21:30:49.816] └ ○ /room/[roomid]                        13.4 kB        93.2 kB
-[21:30:49.816] + First Load JS shared by all             79.8 kB
-[21:30:49.816]   ├ chunks/framework-64ad27b21261a9ce.js  44.8 kB
-[21:30:49.816]   ├ chunks/main-9aba655ce0bf5282.js       34 kB
-[21:30:49.816]   └ other shared chunks (total)           947 B
-[21:30:49.816] 
-[21:30:49.816] ○  (Static)   prerendered as static content
-[21:30:49.817] ƒ  (Dynamic)  server-rendered on demand
-[21:30:49.817] 
-[21:30:49.888] Traced Next.js server files in: 31.239ms
-[21:30:50.005] Created all serverless functions in: 116.918ms
-[21:30:50.009] Collected static files (public/, static/, .next/static): 2.126ms
-[21:30:50.039] Build Completed in /vercel/output [13s]
-[21:30:50.157] Deploying outputs...
-[21:30:56.657] Deployment completed
-[21:30:57.539] Creating build cache...
-[21:31:03.471] Created build cache: 5.931s
-[21:31:03.471] Uploading build cache [67.68 MB]
-[21:31:04.507] Build cache uploaded: 1.035s
+// This is our main page, where users enter their details to join a room
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { io } from 'socket.io-client';
+
+// The main component for our planning poker app
+export default function Home() {
+  const router = useRouter();
+  const [user, setUser] = useState('');
+  const [room, setRoom] = useState('');
+
+  // Use a ref to store the socket instance
+  const socketRef = useRef(null);
+
+  // This effect runs once when the component mounts
+  useEffect(() => {
+    // We only create the socket connection if it doesn't already exist
+    if (!socketRef.current) {
+      // Connect to the Vercel-provided server URL
+      const socket = io(process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000');
+      
+      // Store the socket instance in the ref
+      socketRef.current = socket;
+
+      // Handle server-side events
+      socket.on('connect', () => {
+        console.log('Successfully connected to the server!');
+      });
+
+      // Handle the 'update-room' event, which is a personalized message for a new user
+      socket.on('update-room', (data) => {
+        console.log(data.message);
+      });
+
+      // Handle the 'user-joined' event, which is a broadcast to all users in the room
+      socket.on('user-joined', (data) => {
+        console.log(`${data.user} has joined the room!`);
+      });
+
+      // Clean up the socket connection when the component unmounts
+      return () => {
+        if (socket.connected) {
+          socket.disconnect();
+          console.log('Disconnected from the server.');
+        }
+      };
+    }
+  }, []);
+
+  // Handle the form submission
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (user && room) {
+      // Emit the 'join-room' event with the user and room data
+      socketRef.current.emit('join-room', { roomid: room, user });
+      
+      // Navigate to the dynamic room URL
+      router.push(`/room/${room}?user=${user}`);
+    } else {
+      alert('Please enter your name and a room ID!');
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Join a Poker Room</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Your Name</label>
+            <input
+              type="text"
+              id="name"
+              value={user}
+              onChange={(e) => setUser(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Enter your name"
+            />
+          </div>
+          <div>
+            <label htmlFor="room" className="block text-sm font-medium text-gray-700">Room ID</label>
+            <input
+              type="text"
+              id="room"
+              value={room}
+              onChange={(e) => setRoom(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Enter a room ID"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Join Room
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
