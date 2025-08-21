@@ -7,15 +7,16 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc } from 'firebase/firestore';
 
+let app, auth, db;
+let userId;
+let firebaseInitialized = false;
+
 // The main component for our planning poker room
 export default function Room() {
   const router = useRouter();
   const { room, user } = router.query;
   
   // State variables for Firebase services and data
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [roomData, setRoomData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,34 +30,54 @@ export default function Room() {
   // Use a single useEffect hook for Firebase initialization and data listening
   useEffect(() => {
     async function initializeFirebase() {
+      if (firebaseInitialized) {
+        setLoading(false);
+        return;
+      }
       try {
-        // Log that we're starting the Firebase initialization
         console.log('Initializing Firebase...');
 
-        // IMPORTANT: Use the global variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
+        // Use a fallback configuration if the provided one is not available
+        let firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        if (!firebaseConfig || !firebaseConfig.projectId) {
+            console.warn('Firebase config missing projectId. Using a fallback to prevent crash.');
+            firebaseConfig = {
+                apiKey: "mock-api-key",
+                authDomain: "mock-auth-domain",
+                projectId: "mock-project-id",
+                storageBucket: "mock-storage-bucket",
+                messagingSenderId: "mock-sender-id",
+                appId: "mock-app-id"
+            };
+        }
+        
         // Initialize Firebase with the provided configuration
-        const app = initializeApp(firebaseConfig);
-        const dbInstance = getFirestore(app);
-        const authInstance = getAuth(app);
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
 
         // Sign in the user. We try with the custom token first, then fall back to anonymous.
         if (initialAuthToken) {
-          await signInWithCustomToken(authInstance, initialAuthToken);
+          await signInWithCustomToken(auth, initialAuthToken);
         } else {
-          await signInAnonymously(authInstance);
+          await signInAnonymously(auth);
         }
 
-        // Once authenticated, set the user ID and services
-        setUserId(authInstance.currentUser?.uid || crypto.randomUUID());
-        setDb(dbInstance);
-        setAuth(authInstance);
-        setLoading(false);
-        console.log('Firebase initialized and user authenticated.');
+        // Once authenticated, get the user ID and set it
+        onAuthStateChanged(auth, (currentUser) => {
+          if (currentUser) {
+            userId = currentUser.uid;
+            console.log('User authenticated with ID:', userId);
+          } else {
+            console.log('No user authenticated.');
+          }
+          setLoading(false);
+        });
 
+        firebaseInitialized = true;
+        
       } catch (error) {
         console.error('Failed to initialize Firebase or authenticate user:', error);
         setLoading(false);
