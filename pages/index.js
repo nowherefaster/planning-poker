@@ -1,77 +1,107 @@
 // This is our main page, where users enter their details to join a room
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { io } from 'socket.io-client';
+
+// Import Firebase and Firestore modules
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 // The main component for our planning poker app
 export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState('');
   const [room, setRoom] = useState('');
+  const [db, setDb] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Use a ref to store the socket instance
-  const socketRef = useRef(null);
-
-  // This effect runs once when the component mounts
+  // This effect runs once to initialize Firebase and authenticate the user
   useEffect(() => {
-    // We only create the socket connection if it doesn't already exist
-    if (!socketRef.current) {
-      // Connect to the server's Socket.IO endpoint using a relative path
-      const socket = io({
-        path: '/api/socket',
-        transports: ['websocket', 'polling'], // Prioritize websockets
-        reconnectionAttempts: 5 // Add more attempts to reconnect on failure
-      });
-      
-      // Store the socket instance in the ref
-      socketRef.current = socket;
+    async function initializeFirebase() {
+      try {
+        console.log('Initializing Firebase...');
 
-      // Handle server-side events
-      socket.on('connect', () => {
-        console.log('Successfully connected to the server!');
-      });
-      
-      // Handle connection errors
-      socket.on('connect_error', (err) => {
-        console.error('Socket connection error:', err.message);
-      });
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        const app = initializeApp(firebaseConfig);
+        const dbInstance = getFirestore(app);
+        const authInstance = getAuth(app);
 
-      // Handle the 'update-room' event, which is a personalized message for a new user
-      socket.on('update-room', (data) => {
-        console.log(data.message);
-      });
-
-      // Handle the 'user-joined' event, which is a broadcast to all users in the room
-      socket.on('user-joined', (data) => {
-        console.log(`${data.user} has joined the room!`);
-      });
-
-      // Clean up the socket connection when the component unmounts
-      return () => {
-        if (socket.connected) {
-          socket.disconnect();
-          console.log('Disconnected from the server.');
+        // Sign in the user. We try with the custom token first, then fall back to anonymous.
+        if (initialAuthToken) {
+          await signInWithCustomToken(authInstance, initialAuthToken);
+        } else {
+          await signInAnonymously(authInstance);
         }
-      };
+
+        // Set up an auth state listener to get the user ID
+        onAuthStateChanged(authInstance, (currentUser) => {
+          if (currentUser) {
+            setUserId(currentUser.uid);
+            console.log('User authenticated with ID:', currentUser.uid);
+          } else {
+            // This case should not be reached with anonymous auth
+            console.log('No user authenticated.');
+          }
+          setLoading(false);
+        });
+
+        // Store the Firebase service instances in state
+        setDb(dbInstance);
+        setAuth(authInstance);
+
+      } catch (error) {
+        console.error('Failed to initialize Firebase or authenticate user:', error);
+        setLoading(false);
+      }
     }
+
+    initializeFirebase();
   }, []);
 
   // Handle the form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (user && room) {
-      // Emit the 'join-room' event with the user and room data
-      socketRef.current.emit('join-room', { roomid: room, user });
+    if (user && room && db && userId) {
+      // Construct the document path for the current room
+      const roomRef = doc(db, 'artifacts', userId, 'poker-rooms', room);
       
-      // Navigate to the dynamic room URL
-      router.push(`/room/${room}?user=${user}`);
+      try {
+        // Set a document with a simple message to initialize it if it doesn't exist
+        await setDoc(roomRef, { 
+          initialized: true,
+          createdAt: new Date().toISOString()
+        }, { merge: true });
+
+        // Log the successful creation/update
+        console.log(`Room document for ${room} created/updated in Firestore.`);
+
+        // Navigate to the dynamic room URL
+        router.push(`/room/${room}?user=${user}`);
+      } catch (error) {
+        console.error('Error creating/joining room:', error);
+        alert('Failed to join room. Please try again.');
+      }
     } else {
-      alert('Please enter your name and a room ID!');
+      alert('Please wait for the app to load and then enter your name and a room ID!');
     }
   };
 
+  // Render a loading state or the main content based on state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4 font-sans antialiased">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Join a Poker Room</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -104,6 +134,10 @@ export default function Home() {
             Join Room
           </button>
         </form>
+      </div>
+      <div className="mt-4 text-xs text-gray-500 text-center">
+        <p>Your user ID for debugging purposes:</p>
+        <p className="font-mono break-all">{userId}</p>
       </div>
     </div>
   );
