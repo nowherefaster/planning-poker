@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 
 // Import Firebase and Firestore modules
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 // The main component for our planning poker room
@@ -34,15 +34,14 @@ export default function Room() {
 
         // IMPORTANT: Use environment variables provided by Vercel
         const firebaseConfig = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG);
-        const initialAuthToken = process.env.NEXT_PUBLIC_INITIAL_AUTH_TOKEN;
 
         // Initialize Firebase with the provided configuration
         const app = initializeApp(firebaseConfig);
         const dbInstance = getFirestore(app);
         const authInstance = getAuth(app);
 
-        // Sign in the user with the custom token
-        await signInWithCustomToken(authInstance, initialAuthToken);
+        // Sign in the user anonymously.
+        await signInAnonymously(authInstance);
 
         // Once authenticated, get the user ID and set it
         const unsubscribe = onAuthStateChanged(authInstance, (currentUser) => {
