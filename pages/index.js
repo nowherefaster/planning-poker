@@ -3,13 +3,27 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 // Import Firebase and Firestore modules
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
-let app, auth, db;
-let userId;
-let firebaseInitialized = false;
+// Random Adjective Animal name generator
+const generateRandomName = () => {
+  const adjectives = [
+    'Agile', 'Brave', 'Clever', 'Daring', 'Eager', 'Fearless', 'Gentle',
+    'Happy', 'Ingenious', 'Jolly', 'Keen', 'Lively', 'Mighty', 'Nimble',
+    'Optimistic', 'Playful', 'Quick', 'Radiant', 'Swift', 'Tenacious',
+    'Upbeat', 'Vibrant', 'Wise', 'Zealous'
+  ];
+  const animals = [
+    'Badger', 'Bear', 'Cheetah', 'Dolphin', 'Eagle', 'Falcon', 'Fox',
+    'Giraffe', 'Hawk', 'Koala', 'Leopard', 'Lion', 'Otter', 'Owl',
+    'Panda', 'Panther', 'Penguin', 'Rabbit', 'Tiger', 'Wolf', 'Zebra'
+  ];
+  const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
+  return `${randomAdj} ${randomAnimal}`;
+};
 
 // The main component for our planning poker app
 export default function Home() {
@@ -17,45 +31,43 @@ export default function Home() {
   const [user, setUser] = useState('');
   const [room, setRoom] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentUid, setCurrentUid] = useState(null);
+  const [firestoreDb, setFirestoreDb] = useState(null);
+
+  // Pre-generate a fun random name on initial mount
+  useEffect(() => {
+    setUser(generateRandomName());
+  }, []);
 
   // This effect runs once to initialize Firebase and authenticate the user
   useEffect(() => {
+    let unsubscribe;
     async function initializeFirebase() {
-      if (firebaseInitialized) {
-        setLoading(false);
-        return;
-      }
       try {
         console.log('Initializing Firebase...');
 
         // Use environment variables provided by Vercel
         const firebaseConfig = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG);
-        const initialAuthToken = process.env.NEXT_PUBLIC_INITIAL_AUTH_TOKEN;
 
-        // Initialize Firebase with the provided configuration
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
+        const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        setFirestoreDb(db);
 
-        // Sign in the user anonymously. This is the simplest method and ideal for this app.
-        await signInAnonymously(auth);
+        // Sign in anonymously if not already signed in
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
 
-        // Set up an auth state listener to get the user ID
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
           if (currentUser) {
-            userId = currentUser.uid;
-            console.log('User authenticated with ID:', userId);
+            setCurrentUid(currentUser.uid);
+            console.log('User authenticated with ID:', currentUser.uid);
           } else {
             console.log('No user authenticated.');
           }
           setLoading(false);
         });
-
-        firebaseInitialized = true;
-
-        // Return a cleanup function
-        return () => unsubscribe();
-
       } catch (error) {
         console.error('Failed to initialize Firebase or authenticate user:', error);
         setLoading(false);
@@ -63,35 +75,41 @@ export default function Home() {
     }
 
     initializeFirebase();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Handle the form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (user && room && !loading && db && userId) {
+    const finalUser = user.trim() || generateRandomName();
+    const finalRoom = room.trim();
+
+    if (finalRoom && !loading && firestoreDb && currentUid) {
       // Construct the document path for the shared poker room
-      const roomRef = doc(db, 'poker-rooms', room);
+      const roomRef = doc(firestoreDb, 'poker-rooms', finalRoom);
       
       try {
         // Set a document with a simple message to initialize it if it doesn't exist
         await setDoc(roomRef, { 
           initialized: true,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          estimationType: 'fibonacci'
         }, { merge: true });
 
         // Log the successful creation/update
-        console.log(`Room document for ${room} created/updated in Firestore.`);
+        console.log(`Room document for ${finalRoom} created/updated in Firestore.`);
 
         // Navigate to the dynamic room URL
-        router.push(`/room/${room}?user=${user}`);
+        router.push(`/room/${finalRoom}?user=${encodeURIComponent(finalUser)}`);
       } catch (error) {
         console.error('Error creating/joining room:', error);
-        // We will show an alert to the user.
-        alert('Failed to join room. Please try again.');
+        alert(`Failed to join room: ${error.message || error}`);
       }
     } else {
-      // We will show an alert to the user.
-      alert('Please wait for the app to load and then enter your name and a room ID!');
+      alert('Please wait for the app to load and make sure to enter a Room ID!');
     }
   };
 
@@ -110,14 +128,23 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">Join a Poker Room</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Your Name</label>
+            <div className="flex justify-between items-center">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">Your Name</label>
+              <button
+                type="button"
+                onClick={() => setUser(generateRandomName())}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+              >
+                🎲 Randomize
+              </button>
+            </div>
             <input
               type="text"
               id="name"
               value={user}
               onChange={(e) => setUser(e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Enter your name"
+              placeholder="Your name"
             />
           </div>
           <div>
@@ -127,6 +154,7 @@ export default function Home() {
               id="room"
               value={room}
               onChange={(e) => setRoom(e.target.value)}
+              required
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Enter a room ID"
             />
@@ -141,8 +169,9 @@ export default function Home() {
       </div>
       <div className="mt-4 text-xs text-gray-500 text-center">
         <p>Your user ID for debugging purposes:</p>
-        <p className="font-mono break-all">{userId}</p>
+        <p className="font-mono break-all">{currentUid}</p>
       </div>
     </div>
   );
 }
+

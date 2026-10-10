@@ -70,3 +70,12 @@ The Agile Planning Poker App is a web-based tool designed to facilitate team-bas
 > 4. **Voting Logic:** Implement the different voting mechanisms (numeric, time, t-shirt) and the reveal functionality.  
 > 5. **Styling:** Apply the Slalom-inspired styling to the entire application.  
 > 6. **Deployment:** Deploy the app to Vercel.
+
+#### **7\. Backlog & Future Enhancements**
+
+> * **Room Data Retention & Auto-Cleanup (Firestore TTL):**
+>   * Set an automatic Time-To-Live (TTL) expiration on rooms (e.g., 7–14 days) to clear inactive rooms and prevent room-name collision/stale data.
+> * **Facilitator Session Controls:**
+>   * Allow session hosts to explicitly close or delete a room at the end of a planning session.
+> * **Presence Pruning:**
+>   * Automatically clean up disconnected participants after inactivity or upon leaving the room.

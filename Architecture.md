@@ -92,10 +92,24 @@ Mapped against requirements from [`PRD - Agile Planning Poker App.md`](./PRD%20-
 | **Anonymous Auth** | ✅ Completed | Implemented via `firebase/auth`. |
 | **Shared Room Sync** | ✅ Completed | Scoped to shared `/poker-rooms/{roomId}` collection. |
 | **Presence List** | ✅ Completed | Real-time member display using Firestore document snapshot. |
-| **Fibonacci Deck Voting** | 🟡 Partial | Standard values up to 13 implemented; needs 21, 40, 100. |
-| **Multi-Deck Support** | ⏳ Planned | Time (Days/Weeks) and T-shirt sizing decks. |
-| **Reveal Votes Logic** | ⏳ Planned | Toggle `revealed` state and render card values / results summary. |
-| **Auto-Reveal** | ⏳ Planned | Reveal automatically when 100% of connected members cast votes. |
-| **New Round / Reset** | ⏳ Planned | Clear votes and reset `revealed` flag for next story. |
-| **Fallback Name Generator** | ⏳ Planned | Auto-assign "Adjective Animal" if name input is blank. |
+| **Fibonacci Deck Voting** | ✅ Completed | Standard values (0, 1, 2, 3, 5, 8, 13, 21, 40, 100, ☕, ?). |
+| **Multi-Deck Support** | ✅ Completed | Fibonacci, Time (Days), and T-Shirt sizing decks with real-time switching. |
+| **Reveal Votes Logic** | ✅ Completed | Manual button toggles `revealed: true`, renders actual cards & summary stats. |
+| **Auto-Reveal** | ✅ Completed | Automatically reveals votes when 100% of participants have voted. |
+| **New Round / Reset** | ✅ Completed | Resets `revealed: false` and clears participant votes across the room. |
+| **Fallback Name Generator** | ✅ Completed | Auto-generates random "Adjective Animal" (e.g. Swift Otter) or via 🎲 Randomize button. |
 | **Slalom Aesthetic Styling** | 🟡 Partial | Tailwind utility styling present; theme tokens to be refined. |
+
+---
+
+## 6. Backlog & Future Enhancements
+
+### 6.1 Database Hygiene & Room Retention
+- [ ] **Firestore Built-in TTL Policy (Auto-Expiration)**:
+  - Add an `expiresAt` timestamp field (e.g., 7–14 days from creation or last active timestamp) to `/poker-rooms/{roomId}` documents.
+  - Enable a Firestore TTL policy on `expiresAt` (`gcloud firestore fields ttls update --collection-group=poker-rooms --field-path=expiresAt --enable-ttl`) to purge stale rooms automatically without operational overhead.
+- [ ] **Room Cleanup UI ("Close Room")**:
+  - Add a "Close Room" / "Delete Room" facilitator action to allow meeting hosts to immediately clean up the room document when a session finishes.
+- [ ] **Heartbeat / Stale Member Presence Cleanup**:
+  - Detect disconnected or idle participants and remove inactive UIDs from the `users` map.
+
