@@ -78,10 +78,8 @@ const PokerRoom = () => {
     if (db && roomid && userId) {
       console.log('Setting up real-time listener for room:', roomid);
       
-      // Get the document reference for the specific room
-      // The path is /artifacts/{appId}/poker-rooms/{roomId}
-      // Note: We're using a single user's uid to scope the rooms, as defined in the PRD.
-      const roomRef = doc(db, 'artifacts', userId, 'poker-rooms', roomid);
+      // Get the document reference for the specific room in the shared collection
+      const roomRef = doc(db, 'poker-rooms', roomid);
 
       // Listen for real-time updates to the room document
       const unsubscribe = onSnapshot(roomRef, (docSnap) => {
@@ -101,7 +99,7 @@ const PokerRoom = () => {
       });
 
       // Update the user's presence in the room document
-      const userRef = doc(db, 'artifacts', userId, 'poker-rooms', roomid);
+      const userRef = doc(db, 'poker-rooms', roomid);
       const userPresence = {
         name: decodeURIComponent(user),
         uid: userId,
@@ -128,7 +126,7 @@ const PokerRoom = () => {
     }
 
     try {
-      const roomRef = doc(db, 'artifacts', userId, 'poker-rooms', roomid);
+      const roomRef = doc(db, 'poker-rooms', roomid);
       
       // Update the user's vote in the Firestore document
       await updateDoc(roomRef, {

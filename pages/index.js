@@ -69,8 +69,8 @@ export default function Home() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (user && room && !loading && db && userId) {
-      // Construct the document path for the current room
-      const roomRef = doc(db, 'artifacts', userId, 'poker-rooms', room);
+      // Construct the document path for the shared poker room
+      const roomRef = doc(db, 'poker-rooms', room);
       
       try {
         // Set a document with a simple message to initialize it if it doesn't exist
